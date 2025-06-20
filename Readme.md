@@ -58,42 +58,6 @@ Prompt Construction → LLM Generation → Response
 This diagram illustrates the workflow of a document processing and user query system. It begins with document ingestion and user queries, which are then processed through chunking and embedding models. The workflow integrates an H2 database for embedding storage and facilitates similarity search for chunk retrieval. Finally, it assembles context for LLM processing.
 ![img.png](img.png)
 
-# Structure & Files
-Complete Project Structure
-RAGNavigator/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── nitin/
-│   │   │           ├── RAGNavigator.java
-│   │   │           ├── config/
-│   │   │           │   └── RestTemplateConfig.java
-│   │   │           │   └── CacheConfig.java
-│   │   │           ├── controller/
-│   │   │           │   ├── HealthController.java
-│   │   │           │   ├── RagController.java
-│   │   │           │   └── WebController.java
-│   │   │           ├── entity/
-│   │   │           │   ├── Document.java
-│   │   │           ├── dto/
-│   │   │           │   ├── IndexRequest.java
-│   │   │           │   ├── QueryRequest.java
-│   │   │           ├── repository/
-│   │   │           │   ├── DocumentRepository.java
-│   │   │           ├── service/
-│   │   │           │   ├── DocumentService.java
-│   │   │           │   ├── LlamaService.java
-│   │   │           │   ├── RagService.java
-│   │   └── resources/
-│   │       ├── templates/
-│   │       │   ├── chat-page.html
-│   │       └── application.properties
-│   └── test/
-│       └── java/
-├── pom.xml
-└── README.md
-
 # API Endpoints
 - POST /api/rag/index-file - Index documents from a directory 
 - POST /api/rag/index-directory - Index documents from a directory
@@ -101,8 +65,10 @@ RAGNavigator/
 - POST /api/rag/clear - Clear the indexes
 
 # URL
-llama Server : ./build/bin/llama-server -m llama-2-7b-chat.Q4_K_M.gguf --port 8081 --ctx-size 2048 --n-gpu-layers 1 -t 8 -b 1024 --mlock --no-mmap
-Browser : http://localhost:8080/
+Running llama Server
+  ./build/bin/llama-server -m llama-2-7b-chat.Q4_K_M.gguf --port 8081 --ctx-size 2048 --n-gpu-layers 1 -t 8 -b 1024 --mlock --no-mmap
+Accessing Browser URL
+  http://localhost:8080/
 
 # Curl Command for Indexing and Query the RAG system
 curl -X POST http://localhost:8080/api/rag/index -H "Content-Type: application/json" -d '{"directoryPath": "/path/to/your/documents"}'
