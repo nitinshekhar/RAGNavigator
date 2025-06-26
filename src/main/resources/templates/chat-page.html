@@ -82,23 +82,31 @@
 
               <!-- Directory Panel -->
               <div class="tab-pane fade" id="directory-panel" role="tabpanel">
-                <div class="row g-2 align-items-center">
-                  <div class="col">
-                    <div class="input-group input-group-sm">
-                      <span class="input-group-text">
-                        <i class="bi bi-folder"></i>
-                      </span>
-                      <input type="text"
-                             id="directoryInput"
-                             class="form-control directory-input"
-                             placeholder="Enter directory path">
-                    </div>
+                <!-- Directory Selection Drop Zone -->
+                <div class="directory-drop-zone" id="directoryDropZone">
+                  <i class="bi bi-folder2-open fs-2 text-muted mb-2"></i>
+                  <p class="mb-2">Click to select a directory</p>
+                  <small class="text-muted">Browse and select a folder to index</small>
+                  <input type="file" id="directoryInput" webkitdirectory multiple style="display: none;">
+                </div>
+
+                <!-- Selected Directory Display -->
+                <div id="selectedDirectoryDisplay" class="mt-2" style="display: none;">
+                  <div class="alert alert-info py-2">
+                    <i class="bi bi-folder-fill me-2"></i>
+                    <span id="selectedDirectoryName"></span>
+                    <small class="text-muted ms-2">(<span id="selectedFileCount"></span> files)</small>
                   </div>
-                  <div class="col-auto">
-                    <button id="indexDirBtn" class="btn btn-success btn-sm" disabled>
-                      <i class="bi bi-search"></i> Index
-                    </button>
-                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-2 d-flex gap-2">
+                  <button id="indexDirBtn" class="btn btn-success btn-sm" disabled>
+                    <i class="bi bi-search me-1"></i>Index Directory
+                  </button>
+                  <button id="clearDirBtn" class="btn btn-outline-secondary btn-sm" disabled>
+                    <i class="bi bi-x-circle me-1"></i>Clear Selection
+                  </button>
                 </div>
               </div>
             </div>
@@ -169,8 +177,16 @@
   const fileInput = document.getElementById('fileInput');
   const uploadBtn = document.getElementById('uploadBtn');
   const clearFilesBtn = document.getElementById('clearFilesBtn');
+
+  // Directory elements
+  const directoryDropZone = document.getElementById('directoryDropZone');
   const directoryInput = document.getElementById('directoryInput');
   const indexDirBtn = document.getElementById('indexDirBtn');
+  const clearDirBtn = document.getElementById('clearDirBtn');
+  const selectedDirectoryDisplay = document.getElementById('selectedDirectoryDisplay');
+  const selectedDirectoryName = document.getElementById('selectedDirectoryName');
+  const selectedFileCount = document.getElementById('selectedFileCount');
+
   const indexStatus = document.getElementById('indexStatus');
   const indexedFiles = document.getElementById('indexedFiles');
   const chatMessages = document.getElementById('chatMessages');
@@ -182,17 +198,11 @@
 
   let hasIndexedContent = false;
   let selectedFiles = [];
+  let selectedDirectoryFiles = [];
 
   // Initialize
   document.addEventListener('DOMContentLoaded', function() {
       console.log('Application starting...');
-
-      const config = window.SPRING_CONFIG || {};
-      if (config.directoryPath) {
-          directoryInput.value = config.directoryPath;
-          indexDirBtn.disabled = false;
-      }
-
       setupEventListeners();
       autoResizeTextarea();
       checkServerConnection();
@@ -210,12 +220,11 @@
       uploadBtn.addEventListener('click', indexFiles);
       clearFilesBtn.addEventListener('click', clearIndex);
 
-      // Directory input
-      directoryInput.addEventListener('input', function(e) {
-          const path = e.target.value.trim();
-          indexDirBtn.disabled = !path;
-      });
+      // Directory drop zone
+      directoryDropZone.addEventListener('click', () => directoryInput.click());
+      directoryInput.addEventListener('change', handleDirectorySelection);
       indexDirBtn.addEventListener('click', indexDirectory);
+      clearDirBtn.addEventListener('click', clearDirectorySelection);
 
       // Chat input
       chatInput.addEventListener('keypress', function(e) {
@@ -279,6 +288,55 @@
       }
   }
 
+  // Directory handling functions
+  function handleDirectorySelection(e) {
+      const files = Array.from(e.target.files);
+
+      if (files.length === 0) return;
+
+      // Filter files by supported types
+      selectedDirectoryFiles = files.filter(file => {
+          const validExtensions = ['.pdf', '.txt', '.md', '.doc', '.docx'];
+          return validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+      });
+
+      // Get directory name from the first file's path
+      const directoryPath = files[0].webkitRelativePath;
+      const directoryName = directoryPath.split('/')[0];
+
+      updateDirectoryDisplay(directoryName, selectedDirectoryFiles.length);
+      indexDirBtn.disabled = selectedDirectoryFiles.length === 0;
+      clearDirBtn.disabled = false;
+  }
+
+  function updateDirectoryDisplay(directoryName, fileCount) {
+      selectedDirectoryName.textContent = directoryName;
+      selectedFileCount.textContent = fileCount;
+      selectedDirectoryDisplay.style.display = 'block';
+
+      // Update the drop zone to show selection
+      directoryDropZone.innerHTML = `
+          <i class="bi bi-folder-check fs-2 text-success mb-2"></i>
+          <p class="mb-2">Directory selected</p>
+          <small class="text-muted">Click to select a different directory</small>
+      `;
+  }
+
+  function clearDirectorySelection() {
+      selectedDirectoryFiles = [];
+      selectedDirectoryDisplay.style.display = 'none';
+      indexDirBtn.disabled = true;
+      clearDirBtn.disabled = true;
+      directoryInput.value = '';
+
+      // Reset drop zone display
+      directoryDropZone.innerHTML = `
+          <i class="bi bi-folder2-open fs-2 text-muted mb-2"></i>
+          <p class="mb-2">Click to select a directory</p>
+          <small class="text-muted">Browse and select a folder to index</small>
+      `;
+  }
+
   async function indexFiles() {
       if (selectedFiles.length === 0) return;
 
@@ -297,7 +355,7 @@
           const response = await fetch(INDEX_FILE_ENDPOINT, {
               method: 'POST',
               body: formData,
-              signal: AbortSignal.timeout(120000) // Increased timeout
+              signal: AbortSignal.timeout(120000)
           });
 
           if (response.ok) {
@@ -323,8 +381,7 @@
   }
 
   async function indexDirectory() {
-      const directoryPath = directoryInput.value.trim();
-      if (!directoryPath) return;
+      if (selectedDirectoryFiles.length === 0) return;
 
       const originalText = indexDirBtn.innerHTML;
       indexDirBtn.disabled = true;
@@ -333,19 +390,26 @@
       updateIndexStatus('Processing directory...', 'text-info');
 
       try {
-          const response = await fetch(INDEX_DIR_ENDPOINT, {
+          // Use the same file upload endpoint but with directory files
+          const formData = new FormData();
+          selectedDirectoryFiles.forEach(file => {
+              formData.append('files', file);
+          });
+
+          const response = await fetch(INDEX_FILE_ENDPOINT, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ directoryPath: directoryPath }),
-              signal: AbortSignal.timeout(120000) // Increased timeout
+              body: formData,
+              signal: AbortSignal.timeout(120000)
           });
 
           if (response.ok) {
               const result = await response.text();
-              addMessage('system', `Directory "${directoryPath}" indexed successfully! You can now ask questions about the documents.`);
+              const directoryName = selectedDirectoryName.textContent;
+              addMessage('system', `Directory "${directoryName}" indexed successfully! Found and indexed ${selectedDirectoryFiles.length} supported files.`);
               hasIndexedContent = true;
               updateRagMode();
-              updateIndexStatus('Directory indexed successfully', 'text-success');
+              updateIndexStatus(`Directory indexed: ${selectedDirectoryFiles.length} files`, 'text-success');
+              displayIndexedFiles(selectedDirectoryFiles.map(f => f.name));
               clearFilesBtn.disabled = false;
           } else {
               const errorText = await response.text();
@@ -375,7 +439,9 @@
               indexedFiles.innerHTML = '';
               clearFilesBtn.disabled = true;
               selectedFiles = [];
+              selectedDirectoryFiles = [];
               updateFileDisplay();
+              clearDirectorySelection();
               addMessage('system', 'Document index cleared. Now in direct chat mode.');
           }
       } catch (error) {
@@ -421,7 +487,6 @@
       showTypingIndicator();
 
       try {
-          // Choose endpoint based on whether we have indexed content
           const endpoint = hasIndexedContent ? QUERY_ENDPOINT : CHAT_ENDPOINT;
 
           const response = await fetch(endpoint, {
@@ -431,7 +496,7 @@
                   query: message,
                   message: message
               }),
-              signal: AbortSignal.timeout(300000) // Increased timeout to 5 minutes
+              signal: AbortSignal.timeout(300000)
           });
 
           hideTypingIndicator();
@@ -464,11 +529,9 @@
 
           if (response.ok) {
               const data = await response.json();
-              // Fixed: Check data.status instead of response.status
               const isHealthy = data.status === 'UP';
               updateStatusIndicator(isHealthy);
 
-              // Check if documentCount exists in the response
               const docCount = data.documentCount || 0;
               connectionStatus.textContent = isHealthy
                   ? `Connected (${docCount} documents indexed)`
